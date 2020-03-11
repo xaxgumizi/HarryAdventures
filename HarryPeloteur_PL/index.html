@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="utf-8">
+<!-- 	<meta name="referrer" content="unsafe-url">
+ -->	<title>Interface</title>
+	<style type="text/css">
+		@font-face {
+		  font-family: oldLondon;
+		  src: url("Olondona.otf");
+		}
+		html{
+			background: url("./background.jpg");
+			background-size: 100%;
+		}
+		body{
+			text-align: center;
+		color: #FFF;
+		font-family: oldLondon, sans-serif;
+		width: 50%;
+		margin: auto;
+		}
+		input, canvas, #characterinfo{
+		border:0.2em solid #000;
+		background-color: #FFF;
+		margin: 0.2em 0.2em 0 0.2em;
+		transition:0.2s ease-in-out;
+		font-size: .9em;
+		font-size: 1.2em;
+		border-radius: 10px;
+		font-family: oldLondon, sans-serif;
+		}
+		h1,h2,h3{
+		font-weight:normal;
+		}
+		input[type="text"]{
+		padding:0.35em;
+		box-sizing:border-box;
+		}
+
+		input[type='submit'], input[type='button']{
+		text-decoration:none;
+		cursor:pointer;
+		padding:0.5em;
+		}
+		input[type='submit']:hover, input[type='button']:hover{
+		background-color:#000;
+		color:#FFF;
+		}
+		#imgcontainer{
+			margin: auto;
+			width: 600px;
+			height: 200px;
+			background-image: url("./vide2.jpg");
+			background-position: center;
+			background-size: 100%;
+			border-radius: 10px;
+		}
+		#characterinfo{
+			float: right;
+			text-align: left;
+			background: url("paper.jpg");
+			padding: 1em 2em 1em 1em;
+			background-size: 100%;
+		}
+		#mapcontainer{
+		}
+		#map{
+			background: url("paper.jpg");
+			background-size: 100%;
+		}
+		#actiontext{
+			background: url("paper.jpg") repeat;
+			padding: 1em;
+			border-radius: 10px;
+			font-size: 1.5em;
+			background-size: 100%;
+			margin: 0.5em;
+		}
+		#manualcommand{
+			display: none;
+		}
+		#actionbuttons{
+			margin: 0.5em;
+		}
+	</style>
+</head>
+<body>
+<h1>Harry Peloteur</h1>
+<h2></h2>
+<br>
+<div id="imgcontainer">
+</div>
+<p id="actiontext">Envoyez une commande pour commencer</p>
+<div id="actionbuttons">
+</div>
+<form id="manualcommand">
+	<input placeholder="ex: combattre, avancer..." type="text" name="command" id="commandbox">
+	<input type="button" name="" value="Envoyer" onclick="sendCommand()">
+</form>
+
+<dir div="lowercontainer">
+<div class="charinfo">
+	<p id ="characterinfo"></p>
+</div>
+<div id="mapcontainer">
+	<canvas id="map"  width="400" height="400"></canvas>
+</div>
+</dir>
+
+<input placeholder="Nom du personnage" type="text" name="command" id="namebox">
+<input type="button" name="" value="Nouvelle partie" onclick="newGame()">
+<script type="text/javascript">
+	
+
+
+	function newGame(){
+		let xhttp = new XMLHttpRequest()
+		xhttp.onreadystatechange = function() {
+		    if (this.readyState == 4 && this.status == 200) {
+		        let data = JSON.parse(xhttp.responseText)
+		        console.log(data)
+		        document.location.hash = data.gameInfos.Game.Id
+		        sendCommand()
+		        document.getElementById("namebox").value = ""
+		    }
+		};
+		xhttp.open("POST", "https://localhost:44344/api/newGame");
+		xhttp.setRequestHeader("Content-Type", "application/json");
+		xhttp.send('"'+ document.getElementById("namebox").value + '1"')
+	}
+
+	function getGameId(){
+		if(window.location.hash.length){
+			return window.location.hash.substring(1)
+		}
+		return false
+	}
+
+	function sendCommand(command = null){
+
+		let gameId = getGameId()
+		if(gameId == false){
+			document.getElementById("actiontext").innerHTML = "Accédez à l'adresse d'une partie existante ou commencez une nouvelle partie"
+			return
+		}
+
+		if(command == null){
+			command = document.getElementById("commandbox").value
+		}
+		document.getElementById("commandbox").value = ""
+
+		let xhttp = new XMLHttpRequest()
+		xhttp.onreadystatechange = function() {
+		    if (this.readyState == 4 && this.status == 200) {
+		        displayData(xhttp.responseText)
+		    }
+		};
+		xhttp.open("PUT", "https://localhost:44344/api/game/"+gameId);
+		xhttp.setRequestHeader("Content-Type", "application/json");
+		xhttp.send('"' + command + '"');
+
+	}
+
+	function displayData(data){
+		data = JSON.parse(data)
+		console.log(data)
+
+		let charInfo = data.gameInfos.Character
+		charhtml = ""
+		charhtml += charInfo.Nom + "<br>"
+		charhtml += "❤️"+charInfo.Pv + "<br>"
+		charhtml += "💰"+charInfo.Po + "<br>"
+		charhtml += "💪 " + charInfo.Force + "<br>"
+		charhtml += "🏃‍♂️ " + charInfo.Fuite + "<br>"
+		charhtml += "🤺 " + charInfo.Dexterite + "<br>"
+		charhtml += "📊 " + charInfo.Xp + "<br>"
+		charhtml += "🏆 " + data.gameInfos.Rooms.length
+
+
+		document.getElementById("characterinfo").innerHTML = charhtml
+
+		document.getElementById("actiontext").innerHTML = data.resultText
+
+		if(data.resultText != "")
+			document.getElementById("actiontext").innerHTML += '<br>'
+
+		document.getElementById("actiontext").innerHTML += data.text.endText
+
+		let actionHtml = ""
+		data.text.actionsPossibles.forEach((i) => {
+			actionHtml += '<input type="button" onclick="sendCommand(\'' + i + '\')" value="' + i.charAt(0).toUpperCase() + i.slice(1) + '">'
+		})
+		document.getElementById("actionbuttons").innerHTML = actionHtml
+
+		drawMap(data.gameInfos.Rooms, data.gameInfos.Character.SalleActuelle)
+	}
+
+	function drawMap(data, current){
+		let canvas = document.getElementById("map")
+		let ctx = canvas.getContext("2d")
+
+		// Vide le canvas
+		ctx.clearRect(0, 0, canvas.width, canvas.height);
+/*
+		var background = new Image();
+	background.src = "./paper.jpg";
+ctx.drawImage(background,0,0);*/
+		let roomsize = 20
+
+		// Calcul les offsets pour centrer
+		let maxx = 0
+		let maxy = 0
+		data.forEach((i) => {
+			if(i.Coordonnees[0] < maxx){
+				maxx = i.Coordonnees[0]
+			}
+			if(i.Coordonnees[1] > maxy){
+				maxy = i.Coordonnees[1]
+			}
+		})
+		let offsetx = (Math.abs(maxx) * roomsize)
+		let offsety = (Math.abs(maxy) * roomsize)
+
+		
+		let playerx = 0
+		let playery = 0
+
+		// Parcours les salles
+		data.forEach((i) => {
+			// Inverse l'axe y pour centrer
+			i.Coordonnees[1] *= -1
+
+			let imgcontainer = document.getElementById('imgcontainer')
+			// Change la couleur en fonction du contenu de la salle
+			switch(i.TypeContenu){
+				case 1:
+					ctx.fillStyle = "blue"
+					break
+				case 2:
+					ctx.fillStyle = "red"
+					break
+				default:
+					ctx.fillStyle = "black"
+					break
+			}
+
+			let centerx = 150
+			let centery = 150
+
+			let roomx = roomsize * i.Coordonnees[0] + offsetx + 150
+			let roomy =  roomsize * i.Coordonnees[1] + offsety + 150
+
+			// Dessine la salle en ajoutant une bordure vide
+			ctx.fillRect(roomx + 1 ,roomy + 1, roomsize-2, roomsize-2)
+
+			let doorx = 0
+			let doory = 0
+			let doorvertical = true
+			i.Portes.forEach((e,i) =>{
+				console.log(i)
+				switch(i){
+					case 0:
+						doorx = roomsize / 2 - 2
+						doorvertical = false
+						break
+					case 1:
+						doorx = roomsize
+						doory = roomsize / 2 - 2
+						break
+					case 2:
+						doorx = roomsize / 2 - 2
+						doory = -roomsize
+						doorvertical = false
+						break
+					case 3:
+						doory = -roomsize / 2 -2
+						break
+				}
+			})
+
+			if(doorvertical){
+				ctx.fillRect(roomx + doorx, roomy + doory, 1, 4)
+			}else{
+				ctx.fillRect(roomx + doorx, roomy + doory, 4, 1)
+
+			}
+			
+
+			// Stocke la position du joueur
+			if(i.Id == current){
+				playerx = i.Coordonnees[0]
+				playery = i.Coordonnees[1]+1
+
+				switch(i.TypeContenu){
+				case 1:
+					imgcontainer.style.backgroundImage = ' url("./object.jpg")'
+					break
+				case 2:
+					imgcontainer.style.backgroundImage = ' url("./monster.jpg")'
+					break
+				default:
+					imgcontainer.style.backgroundImage = ' url("./vide2.jpg")'
+					break
+			}
+			}
+
+		})
+
+		// Dessine le spawn
+		ctx.fillStyle = "darkblue"
+		ctx.fillRect(roomsize * 0 + offsetx + 1 + 150, roomsize * 0 + offsety + 1+150, roomsize-2, roomsize-2)
+
+		// Dessine le joueur
+		ctx.fillStyle = "red"
+		ctx.beginPath();
+		//ctx.fillRect(roomsize * playerx + offsetx + 1, roomsize * playery + offsety + 1, roomsize-4, roomsize-4)
+		ctx.arc(roomsize * playerx + offsetx + roomsize/2 + 150, roomsize * playery + offsety - roomsize/2 +150, roomsize/2.5, 0, Math.PI * 2)
+		ctx.fill()
+
+	}
+
+	sendCommand()
+</script>
+</body>
+</html>
